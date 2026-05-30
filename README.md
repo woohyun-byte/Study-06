@@ -7,7 +7,7 @@ Vibe Coding 학습 프로젝트 — 순수 HTML/CSS/JS로 만든 쇼핑 리스�
 
 ```
 Study-06/
-├── shopping-list.html   # 메인 앱 (HTML + CSS + JS 단일 파일)
+├── index.html           # 메인 앱 (HTML + CSS + JS 단일 파일)
 ├── .gitignore
 └── README.md
 ```
@@ -21,4 +21,4 @@ Study-06/
 
 ## 실행 방법
 
-별도 빌드 없이 `shopping-list.html`을 브라우저에서 바로 열면 됩니다.
+별도 빌드 없이 `index.html`을 브라우저에서 바로 열면 됩니다.
