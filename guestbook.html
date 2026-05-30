@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>방명록</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f1117;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+
+    .container {
+      background: #1a1d27;
+      border-radius: 16px;
+      box-shadow: 0 4px 32px rgba(0,0,0,0.40);
+      width: 100%;
+      max-width: 520px;
+      padding: 32px 28px;
+      height: fit-content;
+      border: 1px solid #2d3148;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #e2e8f0;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+
+    .form input,
+    .form textarea {
+      padding: 12px 16px;
+      border: 2px solid #2d3148;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+      color: #e2e8f0;
+      background: #252837;
+      font-family: inherit;
+    }
+
+    .form input::placeholder,
+    .form textarea::placeholder { color: #4a5280; }
+
+    .form input:focus,
+    .form textarea:focus { border-color: #7c8df0; }
+
+    .form textarea {
+      resize: vertical;
+      min-height: 88px;
+    }
+
+    .form button {
+      padding: 12px;
+      background: #5c6bc0;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .form button:hover:not(:disabled) { background: #7c8df0; }
+    .form button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .error {
+      font-size: 0.85rem;
+      color: #fc8181;
+      margin-top: -4px;
+      display: none;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #2d3148;
+      margin-bottom: 24px;
+    }
+
+    .count {
+      font-size: 0.85rem;
+      color: #6b7280;
+      margin-bottom: 16px;
+    }
+
+    .count span { font-weight: 600; color: #a0aec0; }
+
+    .entries { display: flex; flex-direction: column; gap: 12px; }
+
+    .entry {
+      background: #252837;
+      border-radius: 12px;
+      padding: 16px 18px;
+      border: 1px solid #2d3148;
+    }
+
+    .entry-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .entry-name {
+      font-weight: 600;
+      color: #a5b4fc;
+      font-size: 0.95rem;
+    }
+
+    .entry-time {
+      font-size: 0.78rem;
+      color: #4a5280;
+    }
+
+    .entry-message {
+      color: #cbd5e0;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    .empty {
+      text-align: center;
+      color: #4a5280;
+      padding: 32px 0;
+      font-size: 0.95rem;
+    }
+
+    .loading {
+      text-align: center;
+      color: #4a5280;
+      padding: 24px 0;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📝 방명록</h1>
+
+    <form class="form" id="guestForm">
+      <input type="text" id="nameInput" placeholder="이름" maxlength="50" required />
+      <textarea id="msgInput" placeholder="메시지를 남겨주세요" maxlength="500" required></textarea>
+      <p class="error" id="errorMsg"></p>
+      <button type="submit" id="submitBtn">남기기</button>
+    </form>
+
+    <hr class="divider">
+
+    <div class="count" id="countEl"></div>
+    <div class="entries" id="entries">
+      <div class="loading">불러오는 중...</div>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL  = 'https://tgjdnvjgvcoybewoyvwa.supabase.co';
+    const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnamRudmpndmNveWJld295dndhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMjA3ODksImV4cCI6MjA5NTY5Njc4OX0.nVIbWzB1dxMPWpvq_GCBp1n86nCWI0rd015AN9OJJns';
+
+    const { createClient } = supabase;
+    const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const form       = document.getElementById('guestForm');
+    const nameInput  = document.getElementById('nameInput');
+    const msgInput   = document.getElementById('msgInput');
+    const submitBtn  = document.getElementById('submitBtn');
+    const errorMsg   = document.getElementById('errorMsg');
+    const entriesEl  = document.getElementById('entries');
+    const countEl    = document.getElementById('countEl');
+
+    function formatTime(iso) {
+      const d = new Date(iso);
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    async function loadEntries() {
+      const { data, error } = await db
+        .from('guestbook')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        entriesEl.innerHTML = '<div class="empty">불러오기 실패: ' + escapeHtml(error.message) + '</div>';
+        return;
+      }
+
+      if (!data.length) {
+        countEl.textContent = '';
+        entriesEl.innerHTML = '<div class="empty">아직 방명록이 없습니다. 첫 글을 남겨보세요!</div>';
+        return;
+      }
+
+      countEl.innerHTML = `총 <span>${data.length}개</span>의 방명록`;
+      entriesEl.innerHTML = data.map(e => `
+        <div class="entry">
+          <div class="entry-header">
+            <span class="entry-name">${escapeHtml(e.name)}</span>
+            <span class="entry-time">${formatTime(e.created_at)}</span>
+          </div>
+          <div class="entry-message">${escapeHtml(e.message)}</div>
+        </div>
+      `).join('');
+    }
+
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      errorMsg.style.display = 'none';
+
+      const name    = nameInput.value.trim();
+      const message = msgInput.value.trim();
+      if (!name || !message) return;
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = '저장 중...';
+
+      const { error } = await db
+        .from('guestbook')
+        .insert({ name, message });
+
+      submitBtn.disabled = false;
+      submitBtn.textContent = '남기기';
+
+      if (error) {
+        errorMsg.textContent = '저장 실패: ' + error.message;
+        errorMsg.style.display = 'block';
+        return;
+      }
+
+      nameInput.value = '';
+      msgInput.value  = '';
+      await loadEntries();
+    });
+
+    loadEntries();
+  </script>
+</body>
+</html>
